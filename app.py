@@ -211,11 +211,11 @@ def apply_style(fig, ax_list=None):
     return fig
 
 # ── Modele ────────────────────────────────────────────────────────────────────
-from keras.models import load_model as keras_load_model
+import tensorflow as tf
 
 @st.cache_resource
 def load_model():
-    return keras_load_model("models/lstm_soh_model.h5", compile=False)
+    return tf.keras.models.load_model("models/lstm_soh_model.h5", compile=False)
 
 model = load_model()
 
