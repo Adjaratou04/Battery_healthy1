@@ -215,7 +215,7 @@ import tensorflow as tf
 
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("models/lstm_soh_model.h5", compile=False)
+    return tf.keras.models.load_model("models/model.keras", compile=False)
 
 model = load_model()
 
