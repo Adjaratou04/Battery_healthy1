@@ -211,11 +211,51 @@ def apply_style(fig, ax_list=None):
     return fig
 
 # ── Modele ────────────────────────────────────────────────────────────────────
-import tensorflow as tf
-
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("models/model.keras", compile=False)
+    import json, h5py
+
+    paths = ["models/lstm_soh_model.h5", "models/model.keras", "models/model.h5"]
+
+    # 1. Tentative standard
+    for path in paths:
+        if not os.path.exists(path):
+            continue
+        try:
+            return tf.keras.models.load_model(path, compile=False)
+        except Exception:
+            pass
+
+    # 2. Patch InputLayer incompatibilite Keras 2/3
+    for path in [p for p in paths if p.endswith(".h5") and os.path.exists(p)]:
+        try:
+            with h5py.File(path, "r") as f:
+                config_str = f.attrs.get("model_config", None)
+            if config_str is None:
+                continue
+            config = json.loads(config_str)
+
+            def patch_cfg(cfg):
+                if isinstance(cfg, dict):
+                    if cfg.get("class_name") in ("InputLayer", "input_layer"):
+                        c = cfg.get("config", {})
+                        if "batch_shape" in c:
+                            c["batch_input_shape"] = c.pop("batch_shape")
+                        c.pop("optional", None)
+                    for v in cfg.values():
+                        patch_cfg(v)
+                elif isinstance(cfg, list):
+                    for item in cfg:
+                        patch_cfg(item)
+
+            patch_cfg(config)
+            model = tf.keras.models.model_from_json(json.dumps(config))
+            model.load_weights(path)
+            return model
+        except Exception:
+            pass
+
+    raise RuntimeError("Impossible de charger le modele. Verifiez le fichier dans models/")
 
 model = load_model()
 
