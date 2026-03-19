@@ -1,9 +1,6 @@
 import tensorflow as tf
 
-# Charger ancien modèle
-model = tf.keras.models.load_model("models/lstm_soh_model.h5", compile=False)
+model = tf.keras.models.load_model("lstm_soh_model.h5", compile=False)
+model.save("lstm_soh_model_fixed.h5", save_format="h5")
 
-# Sauvegarder nouveau format
-model.save("models/model.keras")
-
-print("✅ Conversion terminée")
+print("OK - fichier créé : lstm_soh_model_fixed.h5")
