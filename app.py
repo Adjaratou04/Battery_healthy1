@@ -213,49 +213,49 @@ def apply_style(fig, ax_list=None):
 # ── Modele ────────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    import json, h5py
+    import json, h5py, numpy as np
+    from tensorflow.keras import layers, models as km
 
-    paths = ["lstm_soh_model.h5", "model.keras", "model.h5"]
+    # Cherche le fichier h5
+    candidates = ["models/lstm_soh_model.h5", "models/model.h5", "lstm_soh_model.h5"]
+    h5_path = next((p for p in candidates if os.path.exists(p)), None)
 
-    # 1. Tentative standard
-    for path in paths:
-        if not os.path.exists(path):
-            continue
-        try:
-            return tf.keras.models.load_model(path, compile=False)
-        except Exception:
-            pass
+    if h5_path is None:
+        raise RuntimeError("Fichier modele introuvable. Placez lstm_soh_model.h5 a la racine du projet.")
 
-    # 2. Patch InputLayer incompatibilite Keras 2/3
-    for path in [p for p in paths if p.endswith(".h5") and os.path.exists(p)]:
-        try:
-            with h5py.File(path, "r") as f:
-                config_str = f.attrs.get("model_config", None)
-            if config_str is None:
-                continue
-            config = json.loads(config_str)
+    # Lecture brute du fichier h5
+    with h5py.File(h5_path, "r") as f:
+        config_str = f.attrs.get("model_config", None)
 
-            def patch_cfg(cfg):
-                if isinstance(cfg, dict):
-                    if cfg.get("class_name") in ("InputLayer", "input_layer"):
-                        c = cfg.get("config", {})
-                        if "batch_shape" in c:
-                            c["batch_input_shape"] = c.pop("batch_shape")
-                        c.pop("optional", None)
-                    for v in cfg.values():
-                        patch_cfg(v)
-                elif isinstance(cfg, list):
-                    for item in cfg:
-                        patch_cfg(item)
+    if config_str is None:
+        raise RuntimeError("Impossible de lire la config du modele dans le fichier h5.")
 
-            patch_cfg(config)
-            model = tf.keras.models.model_from_json(json.dumps(config))
-            model.load_weights(path)
-            return model
-        except Exception:
-            pass
+    # Patch : corrige les cles incompatibles entre Keras 2 et 3
+    def patch(obj):
+        if isinstance(obj, dict):
+            cn = obj.get("class_name", "")
+            if cn in ("InputLayer", "input_layer"):
+                c = obj.get("config", {})
+                if "batch_shape" in c:
+                    c["batch_input_shape"] = c.pop("batch_shape")
+                c.pop("optional", None)
+                c.pop("ragged", None)
+            for v in obj.values():
+                patch(v)
+        elif isinstance(obj, list):
+            for i in obj:
+                patch(i)
 
-    raise RuntimeError("Impossible de charger le modele. Verifiez le fichier dans models/")
+    config = json.loads(config_str)
+    patch(config)
+
+    # Reconstruit le modele depuis la config patchee
+    model = tf.keras.models.model_from_json(json.dumps(config))
+
+    # Charge les poids
+    model.load_weights(h5_path)
+
+    return model
 
 model = load_model()
 
