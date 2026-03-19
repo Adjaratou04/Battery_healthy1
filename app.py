@@ -215,7 +215,7 @@ def apply_style(fig, ax_list=None):
 def load_model():
     import json, h5py
 
-    paths = ["models/lstm_soh_model.h5", "models/model.keras", "models/model.h5"]
+    paths = ["lstm_soh_model.h5", "model.keras", "model.h5"]
 
     # 1. Tentative standard
     for path in paths:
