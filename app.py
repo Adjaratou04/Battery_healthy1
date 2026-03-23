@@ -213,46 +213,22 @@ def apply_style(fig, ax_list=None):
 # ── Modele ────────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    import json, h5py, numpy as np
-    from tensorflow.keras import layers, models as km
+    import h5py
 
-    # Cherche le fichier h5
     candidates = ["models/lstm_soh_model.h5", "models/model.h5", "lstm_soh_model.h5"]
     h5_path = next((p for p in candidates if os.path.exists(p)), None)
 
     if h5_path is None:
-        raise RuntimeError("Fichier modele introuvable. Placez lstm_soh_model.h5 a la racine du projet.")
+        raise RuntimeError("Fichier modele introuvable. Placez lstm_soh_model.h5 dans le dossier models/")
 
-    # Lecture brute du fichier h5
-    with h5py.File(h5_path, "r") as f:
-        config_str = f.attrs.get("model_config", None)
+    # Reconstruction manuelle de l'architecture (LSTM 50 -> Dense 1)
+    # compatible Keras 2 et Keras 3
+    model = tf.keras.Sequential([
+        tf.keras.layers.LSTM(50, input_shape=(5, 5)),
+        tf.keras.layers.Dense(1)
+    ])
 
-    if config_str is None:
-        raise RuntimeError("Impossible de lire la config du modele dans le fichier h5.")
-
-    # Patch : corrige les cles incompatibles entre Keras 2 et 3
-    def patch(obj):
-        if isinstance(obj, dict):
-            cn = obj.get("class_name", "")
-            if cn in ("InputLayer", "input_layer"):
-                c = obj.get("config", {})
-                if "batch_shape" in c:
-                    c["batch_input_shape"] = c.pop("batch_shape")
-                c.pop("optional", None)
-                c.pop("ragged", None)
-            for v in obj.values():
-                patch(v)
-        elif isinstance(obj, list):
-            for i in obj:
-                patch(i)
-
-    config = json.loads(config_str)
-    patch(config)
-
-    # Reconstruit le modele depuis la config patchee
-    model = tf.keras.models.model_from_json(json.dumps(config))
-
-    # Charge les poids
+    # Charge uniquement les poids
     model.load_weights(h5_path)
 
     return model
